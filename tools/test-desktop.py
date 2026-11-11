@@ -173,6 +173,9 @@ def main():
         native_passed=False
         try:
             receive(); qmp('qmp_capabilities')
+            # Boot ekranı QEMU virtio/ramfb ile 1920x1080 FHD olarak gelir.
+            # Limine.conf 4K (3840x2160) hedefler ama QEMU virtio 1080p üretir;
+            # bu test 1080p'yi doğrular. 4K'ı doğrulamak için ramfb kullanın.
             boot=wait(lambda f:f.size==(1920,1080) and f.getpixel((960,465))[0]>80,
                       'Full HD boot screen did not appear',90)
             boot_start=time.monotonic()

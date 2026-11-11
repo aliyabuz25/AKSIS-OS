@@ -40,6 +40,18 @@ static const int desktop_apps[]={1,2};
 #define LINE UI_LINE
 #define APP_COUNT 6
 
+/* DPI ölçek faktörü — 1080p HD default, 4K destekli. 8-bit sabit nokta
+   (256 = 1.0). 1080p boot'te mevcut görünüm değişmez. */
+static unsigned ui_scale = 256;
+static int ui_scale_px(int n) { return (n * (int)ui_scale) >> 8; }
+static void ui_update_scale(int sw) {
+    if (sw >= 3200)      ui_scale = 512; /* 2.0x */
+    else if (sw >= 2000) ui_scale = 384; /* 1.5x */
+    else                 ui_scale = 256; /* 1.0x */
+}
+/* Ölçeklenmiş taskbar yüksekliği — 4K'ta 96px, 1080p'de 48px */
+static int taskbar_h_scaled(void) { return ui_scale_px(TASKBAR_H); }
+
 static desktop_layout_t shell_layout;
 
 typedef struct {
@@ -275,7 +287,7 @@ static void desktop_refresh(void) {
 static void context_open_at(int x,int y) {
     menu_open=0; calendar_set(0);
     context_x=clamp(x,8,sw-CONTEXT_W-8);
-    context_y=clamp(y,8,sh-TASKBAR_H-CONTEXT_H-8);
+    context_y=clamp(y,8,sh-taskbar_h_scaled()-CONTEXT_H-8);
     context_open=1; context_hover=-1; context_paint=1;
     dragging=-1; marquee_active=0;
     if(marquee_surf) gpu_surface_show(marquee_surf,0);
@@ -304,7 +316,7 @@ static void wallpaper_draw(void) {
     /* Bright neutral desktop surface; the centered mark is the wallpaper. */
     gpu_fill(wallpaper, 0xffffffffu);
     /* Keep the SHENLONG mark visible on every desktop wallpaper. */
-    boot_logo_draw(wallpaper, sw / 2 - 240, (sh - TASKBAR_H) / 2 - 160, 480, 320);
+    boot_logo_draw(wallpaper, sw / 2 - 240, (sh-taskbar_h_scaled()) / 2 - 160, 480, 320);
 }
 
 static void desktop_icons_draw(void) {
@@ -328,47 +340,57 @@ static void taskbar_clock_draw(void) { dock_dirty=1; }
 
 static void taskbar_draw(void) {
     if(!bar) return;
+    int th = (int)bar->h;
+    /* 1x: 48px, 1.5x: 72px, 2x: 96px — dock simge yüksekliği */
+    int icon_h = th - 8;
     gpu_fill(bar,0xfff1f5f9u);
     fill(bar,0,0,sw,1,UI_LINE);
     desktop_rect_t r=shell_layout.start;
     start_button_draw(bar,r.x,r.y,r.w,r.h,hover==100,menu_open);
     r=shell_layout.copilot;
-    if(hover==98||ai_open) fill(bar,r.x+2,4,r.w-4,40,0xffe2e8f0u);
-    ai_draw_circle_icon(bar,r.x+r.w/2,r.y+r.h/2,13,hover==98||ai_open);
+    if(hover==98||ai_open) fill(bar,r.x+2,4,r.w-4,th-8,0xffe2e8f0u);
+    ai_draw_circle_icon(bar,r.x+r.w/2,th/2,ui_scale_px(13),hover==98||ai_open);
     r=shell_layout.search;
     if(r.w > 0) {
-        fill(bar,r.x,6,r.w,36,0xffffffffu);
-        if(hover==99) gpu_draw_rect(bar,r.x,6,r.w,36,UI_ACCENT,1);
-        else gpu_draw_rect(bar,r.x,6,r.w,36,UI_LINE,1);
-        glyph_search(bar,r.x+12,14,DIM);
-        if(r.w>80) ui_text_fit(bar,r.x+38,14,r.w-50,menu_open&&search_len?search:"Aramak için yazın",DIM,0);
+        int sb_h = ui_scale_px(36), sb_y = th/2 - sb_h/2;
+        fill(bar,r.x,sb_y,r.w,sb_h,0xffffffffu);
+        if(hover==99) gpu_draw_rect(bar,r.x,sb_y,r.w,sb_h,UI_ACCENT,1);
+        else gpu_draw_rect(bar,r.x,sb_y,r.w,sb_h,UI_LINE,1);
+        glyph_search(bar,r.x+ui_scale_px(12),sb_y+ui_scale_px(8),DIM);
+        if(r.w>80) ui_text_fit(bar,r.x+ui_scale_px(38),sb_y+ui_scale_px(10),r.w-ui_scale_px(50),menu_open&&search_len?search:"Aramak için yazın",DIM,0);
     }
     for(int i=0;i<APP_COUNT;i++) {
         r=shell_layout.apps[i];
         int active=focused==i&&windows[i].open&&!windows[i].minimized;
-        if(active||hover==101+i) fill(bar,r.x,1,r.w,47,active?0xffe2e8f0u:0xffe8edf5u);
-        icon(bar,r.x+12,11,i,24);
-        if(windows[i].open) fill(bar,r.x+4,45,r.w-8,3,active?UI_ACCENT:0xff94a3b8u);
+        if(active||hover==101+i) fill(bar,r.x,1,r.w,th,active?0xffe2e8f0u:0xffe8edf5u);
+        icon(bar,r.x+ui_scale_px(12),ui_scale_px(6),i,icon_h);
+        if(windows[i].open) fill(bar,r.x+ui_scale_px(4),th-ui_scale_px(3),r.w-ui_scale_px(8),ui_scale_px(3),active?UI_ACCENT:0xff94a3b8u);
     }
     r=shell_layout.network;
-    if(hover==112) fill(bar,r.x,1,r.w,47,0xffe2e8f0u);
-    gpu_draw_rect(bar,r.x+13,15,18,12,net_info.gateway?INK:DIM,1);
-    fill(bar,r.x+21,27,2,4,INK); fill(bar,r.x+17,31,10,1,INK);
-    if(!net_info.gateway) {
-        gpu_draw_line(bar,r.x+26,24,r.x+33,31,UI_DANGER);
-        gpu_draw_line(bar,r.x+33,24,r.x+26,31,UI_DANGER);
+    {
+        int nw=r.w, nh=th;
+        int net_x=r.x+ui_scale_px(13), net_y=th/2-ui_scale_px(6);
+        if(hover==112) fill(bar,r.x,1,nw,nh,0xffe2e8f0u);
+        gpu_draw_rect(bar,net_x,net_y,ui_scale_px(18),ui_scale_px(12),net_info.gateway?INK:DIM,1);
+        fill(bar,net_x+ui_scale_px(8),net_y+ui_scale_px(12),ui_scale_px(2),ui_scale_px(4),INK);
+        fill(bar,net_x+ui_scale_px(4),net_y+ui_scale_px(16),ui_scale_px(10),ui_scale_px(1),INK);
+        if(!net_info.gateway) {
+            gpu_draw_line(bar,net_x+ui_scale_px(13),net_y+ui_scale_px(9),net_x+ui_scale_px(20),net_y+ui_scale_px(16),UI_DANGER);
+            gpu_draw_line(bar,net_x+ui_scale_px(20),net_y+ui_scale_px(9),net_x+ui_scale_px(13),net_y+ui_scale_px(16),UI_DANGER);
+        }
     }
     r=shell_layout.clock;
-    if(hover==110||calendar_open) fill(bar,r.x,1,r.w,47,0xffe2e8f0u);
+    if(hover==110||calendar_open) fill(bar,r.x,1,r.w,th,0xffe2e8f0u);
     char t[16],d[16];
     if(time_valid) { clock_time_text(&wall_time,t); t[5]=0; clock_date_text(&wall_time,d); }
     else { kstrcpy(t,"--:--"); kstrcpy(d,""); }
-    center(bar,r.x,5,r.w,t,INK); center(bar,r.x,25,r.w,d,DIM);
+    center(bar,r.x,ui_scale_px(5),r.w,t,INK);
+    center(bar,r.x,th-ui_scale_px(22),r.w,d,DIM);
     r=shell_layout.peek;
-    fill(bar,r.x,1,1,47,UI_LINE);
-    if(hover==111) fill(bar,r.x+1,1,r.w-1,47,0xffe2e8f0u);
+    fill(bar,r.x,1,1,th,UI_LINE);
+    if(hover==111) fill(bar,r.x+1,1,r.w-1,th,0xffe2e8f0u);
     bar->opaque=1;
-    gpu_surface_damage(bar,0,0,sw,TASKBAR_H);
+    gpu_surface_damage(bar,0,0,sw,th);
     dock_dirty=0;
 }
 
@@ -377,37 +399,43 @@ static void menu_draw(void) {
     panel(menu);
 
     /* Left rail: Windows 10 navigation column */
-    fill(menu, 1, 1, 47, menu_h - 2, 0xfff1f5f9u);
-    fill(menu, 48, 1, 1, menu_h - 2, UI_LINE);
+    int rail_w = ui_scale_px(47), rail_sep = ui_scale_px(48);
+    fill(menu, 1, 1, rail_w, menu_h - 2, 0xfff1f5f9u);
+    fill(menu, rail_sep, 1, 1, menu_h - 2, UI_LINE);
 
     /* Hamburger menu glyph at top */
-    for(int i = 0; i < 3; i++) fill(menu, 16, 20 + i * 5, 16, 2, INK);
+    for(int i = 0; i < 3; i++) fill(menu, ui_scale_px(16), ui_scale_px(20) + i * ui_scale_px(5), ui_scale_px(16), ui_scale_px(2), INK);
 
     /* Left rail action buttons (bottom-up) */
+    int rail_btn_w = ui_scale_px(40), rail_btn_h = ui_scale_px(38);
     int r_ai = (hover == 244);
-    if(r_ai||ai_open) fill(menu, 4, menu_h - 224, 40, 38, 0xffe2e8f0u);
-    ai_draw_circle_icon(menu, 24, menu_h - 205, 13, r_ai||ai_open);
+    if(r_ai||ai_open) fill(menu, 4, menu_h - ui_scale_px(224), rail_btn_w, rail_btn_h, 0xffe2e8f0u);
+    ai_draw_circle_icon(menu, ui_scale_px(24), menu_h - ui_scale_px(205), ui_scale_px(13), r_ai||ai_open);
 
     int r_user = (hover == 243);
-    if(r_user) fill(menu, 4, menu_h - 180, 40, 38, 0xffe2e8f0u);
-    ui_round(menu, 10, menu_h - 176, 28, 28, 14, 0xff0284c7u);
-    center(menu, 10, menu_h - 170, 28, "A", 0xffffffffu);
+    if(r_user) fill(menu, 4, menu_h - ui_scale_px(180), rail_btn_w, rail_btn_h, 0xffe2e8f0u);
+    {
+        int av_s = ui_scale_px(28), av_r = ui_scale_px(14);
+        ui_round(menu, ui_scale_px(10), menu_h - ui_scale_px(176), av_s, av_s, av_r, 0xff0284c7u);
+        center(menu, ui_scale_px(10), menu_h - ui_scale_px(170), av_s, "A", 0xffffffffu);
+    }
 
     int r_docs = (hover == 201);
-    if(r_docs) fill(menu, 4, menu_h - 136, 40, 38, 0xffe2e8f0u);
-    icon(menu, 12, menu_h - 130, 1, 24);
+    if(r_docs) fill(menu, 4, menu_h - ui_scale_px(136), rail_btn_w, rail_btn_h, 0xffe2e8f0u);
+    icon(menu, ui_scale_px(12), menu_h - ui_scale_px(130), 1, ui_scale_px(24));
 
     int r_sets = (hover == 202);
-    if(r_sets) fill(menu, 4, menu_h - 92, 40, 38, 0xffe2e8f0u);
-    icon(menu, 12, menu_h - 86, 2, 24);
+    if(r_sets) fill(menu, 4, menu_h - ui_scale_px(92), rail_btn_w, rail_btn_h, 0xffe2e8f0u);
+    icon(menu, ui_scale_px(12), menu_h - ui_scale_px(86), 2, ui_scale_px(24));
 
     int r_pwr = (hover == 210);
-    if(r_pwr) fill(menu, 4, menu_h - 48, 40, 38, 0xfffee2e2u);
-    glyph_power(menu, 14, menu_h - 40, r_pwr ? UI_DANGER : INK);
+    if(r_pwr) fill(menu, 4, menu_h - ui_scale_px(48), rail_btn_w, rail_btn_h, 0xfffee2e2u);
+    glyph_power(menu, ui_scale_px(14), menu_h - ui_scale_px(40), r_pwr ? UI_DANGER : INK);
 
     /* Middle column: All Applications list */
-    label(menu, 62, 20, "Tüm Uygulamalar", INK);
-    fill(menu, 62, 42, 210, 1, UI_LINE);
+    int mid_x = ui_scale_px(62), mid_div = ui_scale_px(282), mid_right = ui_scale_px(292);
+    label(menu, mid_x, ui_scale_px(20), "Tüm Uygulamalar", INK);
+    fill(menu, mid_x, ui_scale_px(42), ui_scale_px(210), 1, UI_LINE);
 
     static const char *subtitles[] = {
         "Komut Satırı & Shell",
@@ -420,7 +448,7 @@ static void menu_draw(void) {
 
     for(int k = 0; k < APP_COUNT; k++) {
         int app = menu_order[k];
-        desktop_rect_t r = desktop_app_row(k, menu_h);
+        desktop_rect_t r = desktop_app_row_scaled(k, menu_h, (int)ui_scale);
         int is_hov = (hover == 200 + app || (keyboard_menu && menu_choice == app));
         if(is_hov) {
             fill(menu, r.x, r.y, r.w, r.h, 0xffe2e8f0u);
@@ -428,18 +456,18 @@ static void menu_draw(void) {
         } else {
             fill(menu, r.x, r.y, r.w, r.h, 0x00000000u);
         }
-        icon(menu, r.x + 8, r.y + (r.h - 32) / 2, app, 32);
-        fit_label(menu, (desktop_rect_t){r.x + 48, r.y, r.w - 48, r.h}, 0, 7, names[app], INK);
-        fit_label(menu, (desktop_rect_t){r.x + 48, r.y, r.w - 48, r.h}, 0, 25, subtitles[app], DIM);
+        icon(menu, r.x + ui_scale_px(8), r.y + (r.h - ui_scale_px(32)) / 2, app, ui_scale_px(32));
+        fit_label(menu, (desktop_rect_t){r.x + ui_scale_px(48), r.y, r.w - ui_scale_px(48), r.h}, 0, ui_scale_px(7), names[app], INK);
+        fit_label(menu, (desktop_rect_t){r.x + ui_scale_px(48), r.y, r.w - ui_scale_px(48), r.h}, 0, ui_scale_px(25), subtitles[app], DIM);
     }
 
     /* Vertical divider between middle and right column */
-    fill(menu, 282, 12, 1, menu_h - 72, UI_LINE);
+    fill(menu, mid_div, ui_scale_px(12), 1, menu_h - ui_scale_px(72), UI_LINE);
 
     /* Right column: Windows 10 Live Tiles */
-    label(menu, 292, 20, "Başlangıç", INK);
-    label(menu, menu_w - 140, 20, "AXIS OS", BLUE);
-    fill(menu, 292, 42, menu_w - 308, 1, UI_LINE);
+    label(menu, mid_right, ui_scale_px(20), "Başlangıç", INK);
+    label(menu, menu_w - ui_scale_px(140), ui_scale_px(20), "AXIS OS", BLUE);
+    fill(menu, mid_right, ui_scale_px(42), menu_w - mid_right - ui_scale_px(16), 1, UI_LINE);
 
     static const uint32_t tile_colors[] = {
         0xff334155u, /* Terminal */
@@ -459,30 +487,35 @@ static void menu_draw(void) {
     };
 
     for(int i = 0; i < APP_COUNT; i++) {
-        desktop_rect_t tr = desktop_tile(i, menu_w, menu_h);
+        desktop_rect_t tr = desktop_tile_scaled(i, menu_w, menu_h, (int)ui_scale);
         int is_hov = (hover == 230 + i || (keyboard_menu && menu_choice == i));
+        int isc = ui_scale_px(40);
         fill(menu, tr.x, tr.y, tr.w, tr.h, tile_colors[i]);
         if(is_hov) gpu_draw_rect(menu, tr.x, tr.y, tr.w, tr.h, 0xff0f172au, 2);
         else gpu_draw_rect(menu, tr.x, tr.y, tr.w, tr.h, 0x20000000u, 1);
-        icon(menu, tr.x + (tr.w - 40) / 2, tr.y + (tr.h - 60) / 2, i, 40);
-        fit_label(menu, tr, 10, tr.h - 36, names[i], 0xffffffffu);
-        fit_label(menu, tr, 10, tr.h - 18, tile_subtexts[i], 0xe0ffffffu);
+        icon(menu, tr.x + (tr.w - isc) / 2, tr.y + (tr.h - ui_scale_px(60)) / 2, i, isc);
+        fit_label(menu, tr, ui_scale_px(10), tr.h - ui_scale_px(36), names[i], 0xffffffffu);
+        fit_label(menu, tr, ui_scale_px(10), tr.h - ui_scale_px(18), tile_subtexts[i], 0xe0ffffffu);
     }
 
     /* Bottom footer bar */
     fill(menu, 56, menu_h - 58, menu_w - 68, 1, UI_LINE);
-    ui_round(menu, 66, menu_h - 48, 36, 36, 18, 0xff0284c7u);
-    center(menu, 66, menu_h - 40, 36, "A", 0xffffffffu);
-    label(menu, 110, menu_h - 46, "Ali", INK);
-    label(menu, 110, menu_h - 28, "AXIS OS 10 Pro v6.0.2", DIM);
+    {
+        int av_s = ui_scale_px(36), av_r = ui_scale_px(18);
+        ui_round(menu, 66, menu_h - 48, av_s, av_s, av_r, 0xff0284c7u);
+        center(menu, 66, menu_h - 40, av_s, "A", 0xffffffffu);
+        label(menu, 110, menu_h - 46, "Ali", INK);
+        label(menu, 110, menu_h - 28, "AXIS OS 10 Pro v6.0.2", DIM);
+    }
 
     int px = menu_w - 188;
     int rst_hov = (hover == 210);
-    if(rst_hov) fill(menu, px, menu_h - 50, 176, 40, 0xfffee2e2u);
-    else fill(menu, px, menu_h - 50, 176, 40, 0xfff1f5f9u);
-    gpu_draw_rect(menu, px, menu_h - 50, 176, 40, rst_hov ? UI_DANGER : UI_LINE, 1);
-    glyph_power(menu, px + 10, menu_h - 38, rst_hov ? UI_DANGER : INK);
-    ui_text_fit(menu, px + 38, menu_h - 38, 130, "Yeniden Başlat", rst_hov ? UI_DANGER : INK, 0);
+    int rst_w = ui_scale_px(176), rst_h = ui_scale_px(40);
+    if(rst_hov) fill(menu, px, menu_h - rst_h - ui_scale_px(10), rst_w, rst_h, 0xfffee2e2u);
+    else fill(menu, px, menu_h - rst_h - ui_scale_px(10), rst_w, rst_h, 0xfff1f5f9u);
+    gpu_draw_rect(menu, px, menu_h - rst_h - ui_scale_px(10), rst_w, rst_h, rst_hov ? UI_DANGER : UI_LINE, 1);
+    glyph_power(menu, px + ui_scale_px(10), menu_h - rst_h + ui_scale_px(2), rst_hov ? UI_DANGER : INK);
+    ui_text_fit(menu, px + ui_scale_px(38), menu_h - rst_h + ui_scale_px(2), ui_scale_px(130), "Yeniden Başlat", rst_hov ? UI_DANGER : INK, 0);
 }
 
 static int month_days(int year,int month) {
@@ -601,6 +634,8 @@ static void system_draw(window_t *w) {
     int res_base_y = 314;
     ui_text(s, 32, res_base_y, "Ekran Çözünürlüğü (WDDM / Parallels Adaptasyonu):", INK, 1);
     const char *res_labels[] = {
+        "3840 x 2160 (4K UHD)",
+        "2560 x 1440 (QHD)",
         "1920 x 1080 (FHD)",
         "1600 x 900 (HD+)",
         "1440 x 900 (16:10)",
@@ -608,25 +643,25 @@ static void system_draw(window_t *w) {
         "1024 x 768 (XGA)",
         "800 x 600 (SVGA)"
     };
-    const uint32_t res_w[] = { 1920, 1600, 1440, 1280, 1024,  800 };
-    const uint32_t res_h[] = { 1080,  900,  900,  720,  768,  600 };
+    const uint32_t res_w[] = { 3840, 2560, 1920, 1600, 1440, 1280, 1024,  800 };
+    const uint32_t res_h[] = { 2160, 1440, 1080,  900,  900,  720,  768,  600 };
 
-    for(int r = 0; r < 6; r++) {
-        int btn_x = 32 + (r % 3) * 190;
-        int btn_y = res_base_y + 24 + (r / 3) * 40;
+    for(int r = 0; r < 8; r++) {
+        int btn_x = 32 + (r % 4) * 165;
+        int btn_y = res_base_y + 24 + (r / 4) * 40;
         int active_res = (sw == (int)res_w[r] && sh == (int)res_h[r]);
         uint32_t btn_bg = active_res ? 0xFF0284D7u : UI_RAISED;
         uint32_t btn_border = active_res ? 0xFF0284D7u : UI_LINE;
 
-        fill(s, btn_x, btn_y, 180, 32, btn_bg);
-        gpu_draw_rect(s, btn_x, btn_y, 180, 32, btn_border, 1);
-        ui_text_fit(s, btn_x + 10, btn_y + 8, 160, res_labels[r], active_res ? 0xFFFFFFFFu : INK, 0);
+        fill(s, btn_x, btn_y, 150, 32, btn_bg);
+        gpu_draw_rect(s, btn_x, btn_y, 150, 32, btn_border, 1);
+        ui_text_fit(s, btn_x + 10, btn_y + 8, 130, res_labels[r], active_res ? 0xFFFFFFFFu : INK, 0);
     }
 
     fill(s,28,w->h-76,w->w-56,34,UI_RAISED);
     gpu_draw_rect(s,28,w->h-76,w->w-56,34,UI_LINE,1);
     ui_text_fit(s,42,w->h-66,w->w-84,offset_minutes?"Saat dilimi: İstanbul (UTC+3)  ·  Değiştir":"Saat dilimi: UTC  ·  Değiştir",INK,0);
-    ui_text_fit(s,32,w->h-30,w->w-64,"İpucu: F11 tuşu ile Full HD 1080p ve pencere modu arasında anında geçiş yapabilirsiniz.",DIM,0);
+    ui_text_fit(s,32,w->h-30,w->w-64,"İpucu: F11 tuşu ile 4K UHD ve Full HD 1080p arasında anında geçiş yapabilirsiniz.",DIM,0);
 }
 
 static void network_draw(window_t *w) {
@@ -657,6 +692,9 @@ static void network_draw(window_t *w) {
 #define SHADOW_PAD_Y    16
 #define SHADOW_EXTRA_W  48
 #define SHADOW_EXTRA_H  44
+/* 4K ölçeklenmiş ek gölge genişliği */
+#define SHADOW_EXTRA_W_S  96
+#define SHADOW_EXTRA_H_S  88
 
 static void window_draw_shadow(gpu_surface_t *d, int win_w, int win_h, int active) {
     if (!d || !d->pixels) return;
@@ -901,7 +939,7 @@ static void toggle_maximize(int app) {
     window_t *w=&windows[app];
     if(!w->maximized) {
         w->rx=w->x; w->ry=w->y; w->rw=w->w; w->rh=w->h;
-        w->x=0; w->y=0; w->w=sw; w->h=sh-TASKBAR_H;
+        w->x=0; w->y=0; w->w=sw; w->h=sh-taskbar_h_scaled();
         w->content_dirty=1;
     } else { w->x=w->rx; w->y=w->ry; w->w=w->rw; w->h=w->rh; }
     w->maximized=!w->maximized;
@@ -953,17 +991,17 @@ static int hit_test(int x,int y) {
         }
         for(int k=0;k<APP_COUNT;k++) {
             int app=menu_order[k];
-            desktop_rect_t r=desktop_app_row(k,menu_h);
+            desktop_rect_t r=desktop_app_row_scaled(k,menu_h,(int)ui_scale);
             if(desktop_contains(r,mx,my)) return 200+app;
         }
         for(int i=0;i<APP_COUNT;i++)
-            if(desktop_contains(desktop_tile(i,menu_w,menu_h),mx,my)) return 230+i;
+            if(desktop_contains(desktop_tile_scaled(i,menu_w,menu_h,(int)ui_scale),mx,my)) return 230+i;
         if(inside(mx,my,menu_w-188,menu_h-50,176,40)) return 210;
         return 211;
     }
     if((calendar_open||calendar_anim)&&inside(x,y,calendar->x,calendar->y,calendar->w,calendar->h)) return 220;
-    if(y>=sh-TASKBAR_H) {
-        int ly=y-(sh-TASKBAR_H);
+    if(y>=sh-taskbar_h_scaled()) {
+        int ly=y-(sh-taskbar_h_scaled());
         if(desktop_contains(shell_layout.start,x,ly)) return 100;
         if(desktop_contains(shell_layout.copilot,x,ly)) return 98;
         if(desktop_contains(shell_layout.search,x,ly)) return 99;
@@ -1129,13 +1167,13 @@ static void click(int hit,int x,int y) {
             }
         }
         if(app==2) {
-            const uint32_t res_w[] = { 1920, 1600, 1440, 1280, 1024,  800 };
-            const uint32_t res_h[] = { 1080,  900,  900,  720,  768,  600 };
+            const uint32_t res_w[] = { 3840, 2560, 1920, 1600, 1440, 1280, 1024,  800 };
+            const uint32_t res_h[] = { 2160, 1440, 1080,  900,  900,  720,  768,  600 };
             int res_base_y = 314;
-            for(int r = 0; r < 6; r++) {
-                int btn_x = 32 + (r % 3) * 190;
-                int btn_y = res_base_y + 24 + (r / 3) * 40;
-                if(inside(lx, ly, btn_x, btn_y, 180, 32)) {
+            for(int r = 0; r < 8; r++) {
+                int btn_x = 32 + (r % 4) * 165;
+                int btn_y = res_base_y + 24 + (r / 4) * 40;
+                if(inside(lx, ly, btn_x, btn_y, 150, 32)) {
                     wddm_set_mode(res_w[r], res_h[r]);
                     w->content_dirty = 1;
                     return;
@@ -1173,9 +1211,10 @@ void ui_init(void) {
     wallpaper_init();
     dbg_puts("[UI] wallpaper_init done\n");
     sw=gpu_fb_w; sh=gpu_fb_h;
+    ui_update_scale(sw);
     int max_w = sw > 1920 ? sw : 1920;
     int max_h = sh > 1080 ? sh : 1080;
-    shell_layout=desktop_layout(sw,sh);
+    shell_layout=desktop_layout_scaled(sw,sh,256);
     dbg_puts("[UI] 1. creating wallpaper\n");
     wallpaper=gpu_surface_create(max_w,max_h,0,0,0);
     if(wallpaper) { wallpaper->w=sw; wallpaper->h=sh; wallpaper->stride=sw; }
@@ -1194,12 +1233,15 @@ void ui_init(void) {
         marquee_surf->visible=0;
     }
     dbg_puts("[UI] 4. creating taskbar\n");
-    bar=gpu_surface_create(max_w,TASKBAR_H,0,sh-TASKBAR_H,100);
-    if(bar) {
-        bar->w=sw; bar->stride=sw;
-        bar->opaque=0;
-        bar->opaque_inset=0;
-        bar->visible=1;
+    {
+        int th = ui_scale_px(TASKBAR_H);
+        bar=gpu_surface_create(max_w,th,0,sh-th,100);
+        if(bar) {
+            bar->w=sw; bar->stride=sw;
+            bar->opaque=0;
+            bar->opaque_inset=0;
+            bar->visible=1;
+        }
     }
     menu_w=shell_layout.menu_w; menu_h=shell_layout.menu_h;
     menu_x=shell_layout.menu_x; menu_y=shell_layout.menu_y;
@@ -1207,7 +1249,7 @@ void ui_init(void) {
     context=gpu_surface_create(CONTEXT_W,CONTEXT_H,8,8,120);
     calendar_x = sw - 344 - 12;
     if(calendar_x < 12) calendar_x = 12;
-    calendar_y = sh - TASKBAR_H - 444 - 8;
+    calendar_y = sh-taskbar_h_scaled() - 444 - 8;
     calendar=gpu_surface_create(344,444,calendar_x,calendar_y,112);
     menu->visible=calendar->visible=context->visible=0;
     menu->opaque=calendar->opaque=0;
@@ -1215,25 +1257,29 @@ void ui_init(void) {
     context->opaque=0; context->opaque_inset=0;
 
     ai_init();
-    ai_surface=gpu_surface_create(AI_DRAWER_WIDTH,max_h-TASKBAR_H,sw,0,115);
-    if(ai_surface) {
-        ai_surface->w=AI_DRAWER_WIDTH;
-        ai_surface->h=sh-TASKBAR_H;
-        ai_surface->stride=AI_DRAWER_WIDTH;
-        ai_surface->visible=0;
-        ai_surface->opaque=0;
+    {
+        int ai_w = ui_scale_px(AI_DRAWER_WIDTH);
+        ai_surface=gpu_surface_create(ai_w,max_h-taskbar_h_scaled(),sw,0,115);
+        if(ai_surface) {
+            ai_surface->w=ai_w;
+            ai_surface->h=sh-taskbar_h_scaled();
+            ai_surface->stride=ai_w;
+            ai_surface->visible=0;
+            ai_surface->opaque=0;
+        }
     }
     dbg_puts("[UI] 5. creating window surfaces\n");
     const int widths[]={900,900,720,1040,720,1000},heights[]={570,600,540,680,540,660};
     for(int i=0;i<APP_COUNT;i++) {
         dbg_puts("[UI] window surface create\n");
         window_t *w=&windows[i];
-        w->w=widths[i]<sw-40?widths[i]:sw-40;
-        w->h=heights[i]<sh-TASKBAR_H-40?heights[i]:sh-TASKBAR_H-40;
+        int wi=ui_scale_px(widths[i]), hi=ui_scale_px(heights[i]);
+        w->w=wi<sw-40?wi:sw-40;
+        w->h=hi<sh-taskbar_h_scaled()-40?hi:sh-taskbar_h_scaled()-40;
         w->x=clamp((sw-w->w)/2+i*26,0,sw-w->w);
-        w->y=clamp((sh-TASKBAR_H-w->h)/2+i*18,0,sh-TASKBAR_H-w->h);
-        w->surface=gpu_surface_create(max_w,max_h-TASKBAR_H,0,0,10+i*4);
-        w->shadow=gpu_surface_create(max_w+SHADOW_EXTRA_W,max_h-TASKBAR_H+SHADOW_EXTRA_H,0,0,9+i*4);
+        w->y=clamp((sh-taskbar_h_scaled()-w->h)/2+i*18,0,sh-taskbar_h_scaled()-w->h);
+        w->surface=gpu_surface_create(max_w,max_h-taskbar_h_scaled(),0,0,10+i*4);
+        w->shadow=gpu_surface_create(max_w+SHADOW_EXTRA_W_S,max_h-taskbar_h_scaled()+SHADOW_EXTRA_H_S,0,0,9+i*4);
         if(w->shadow) { w->shadow->opaque=0; w->shadow->visible=0; }
         if(w->surface) {
             w->surface->w=w->w; w->surface->h=w->h;
@@ -1367,7 +1413,8 @@ void ui_on_display_resize(uint32_t new_w, uint32_t new_h) {
     if(new_w < 640 || new_h < 480) return;
     sw = (int)new_w;
     sh = (int)new_h;
-    shell_layout = desktop_layout(sw, sh);
+    ui_update_scale(sw);
+    shell_layout = desktop_layout_scaled(sw, sh, 256);
 
     /* Duvar kağıdı ve arka plan */
     if(wallpaper) {
@@ -1379,14 +1426,25 @@ void ui_on_display_resize(uint32_t new_w, uint32_t new_h) {
         gpu_wallpaper_bake();
     }
 
-    /* Görev çubuğu */
-    if(bar) {
-        bar->w = sw;
-        bar->stride = sw;
-        bar->x = 0;
-        bar->y = sh - TASKBAR_H;
-        bar->visible = 1;
-        taskbar_draw();
+    int max_w = sw > 1920 ? sw : 1920;
+    /* Görev çubuğu — 4K'ta ölçeklenmiş yükseklikte */
+    {
+        int th = taskbar_h_scaled();
+        if(bar && bar->h != (uint32_t)th) {
+            gpu_surface_destroy(bar);
+            bar = gpu_surface_create(max_w, th, 0, sh - th, 100);
+            if(bar) {
+                bar->w = sw; bar->stride = sw;
+                bar->opaque = 0; bar->opaque_inset = 0; bar->visible = 1;
+            }
+        }
+        if(bar) {
+            bar->w = sw; bar->stride = sw;
+            bar->x = 0;
+            bar->y = sh - th;
+            bar->visible = 1;
+            taskbar_draw();
+        }
     }
 
     /* Başlat menüsü */
@@ -1406,7 +1464,7 @@ void ui_on_display_resize(uint32_t new_w, uint32_t new_h) {
     /* Takvim / Saat Flyout */
     calendar_x = sw - 344 - 12;
     if(calendar_x < 12) calendar_x = 12;
-    calendar_y = sh - TASKBAR_H - 444 - 8;
+    calendar_y = sh-taskbar_h_scaled() - 444 - 8;
     if(calendar) {
         calendar->x = calendar_x;
         calendar->y = calendar_y;
@@ -1422,7 +1480,7 @@ void ui_on_display_resize(uint32_t new_w, uint32_t new_h) {
 
     /* AI Offcanvas Yüzeyi */
     if(ai_surface) {
-        ai_surface->h = sh - TASKBAR_H;
+        ai_surface->h = sh-taskbar_h_scaled();
         ai_surface->y = 0;
         ai_surface->x = ai_open ? (sw - AI_DRAWER_WIDTH) : sw;
     }
@@ -1434,12 +1492,12 @@ void ui_on_display_resize(uint32_t new_w, uint32_t new_h) {
             win->x = 0;
             win->y = 0;
             win->w = sw;
-            win->h = sh - TASKBAR_H;
+            win->h = sh-taskbar_h_scaled();
         } else {
             if(win->w > sw - 40) win->w = sw - 40;
-            if(win->h > sh - TASKBAR_H - 40) win->h = sh - TASKBAR_H - 40;
+            if(win->h > sh-taskbar_h_scaled() - 40) win->h = sh-taskbar_h_scaled() - 40;
             win->x = clamp(win->x, 0, sw - win->w);
-            win->y = clamp(win->y, 0, sh - TASKBAR_H - win->h);
+            win->y = clamp(win->y, 0, sh-taskbar_h_scaled() - win->h);
         }
         if(win->surface) {
             win->surface->w = win->w;
@@ -1454,7 +1512,7 @@ void ui_on_display_resize(uint32_t new_w, uint32_t new_h) {
     }
 
     /* Terminal viewport */
-    fb_set_viewport(0, 0, sw, sh - TASKBAR_H);
+    fb_set_viewport(0, 0, sw, sh-taskbar_h_scaled());
 
     dirty = 1;
 }
@@ -1572,7 +1630,7 @@ void ui_poll(void) {
     }
     if(dragging>=0) {
         window_t *w=&windows[dragging];
-        int x=clamp(g_mouse.x-drag_dx,0,sw-w->w),y=clamp(g_mouse.y-drag_dy,0,sh-TASKBAR_H-w->h);
+        int x=clamp(g_mouse.x-drag_dx,0,sw-w->w),y=clamp(g_mouse.y-drag_dy,0,sh-taskbar_h_scaled()-w->h);
         if(x!=w->x||y!=w->y) {
             w->x=x; w->y=y;
             gpu_surface_move(w->surface, x, y);

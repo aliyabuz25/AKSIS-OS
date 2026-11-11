@@ -30,7 +30,13 @@ static int rtc_seconds(void) {
 static uint64_t elapsed_ms(void) {
     if(g_sysinfo.tsc_freq_hz>=1000) return get_uptime_ms()-started;
     int now=rtc_seconds();
-    if(now<0) { timer_ok=0; return BOOT_DURATION_MS; }
+    if(now<0) {
+        /* TSC yok + RTC yok: takilmayi onlemek icin sonsuz degil,
+           3 saniyelik bekleme icin 400000 iterasyon guvenlik limitine sayilir.
+           Bu sayede UTM'de QEMU emulasyonu yavassa bile boot ilerler. */
+        timer_ok=0;
+        return BOOT_DURATION_MS;
+    }
     return (unsigned)((now-rtc_start+86400)%86400)*1000u;
 }
 /* 64-entry fixed-point trigonometri tablosu (sin * 256) */
@@ -137,7 +143,9 @@ static void pump(void) {
 static void pause_ms(unsigned ms) {
     if (g_sysinfo.tsc_freq_hz >= 1000) {
         uint64_t until=elapsed_ms()+ms;
-        while(timer_ok && !skip && elapsed_ms()<until) pump();
+        int guard=0;
+        /* TSC geriye sarsa veya RTC tutarsızsa takilmayi onleme: 4 sn limit */
+        while(timer_ok && !skip && elapsed_ms()<until && guard++ < 400000) pump();
     } else {
         pump();
     }
@@ -164,10 +172,25 @@ void splash_show(void) {
     line_height=gpu_fb_h>=900?36:(gpu_fb_h>=720?28:22);
     mouse_set_visible(0);
     started=get_uptime_ms(); rtc_start=rtc_seconds();
-    timer_ok=g_sysinfo.tsc_freq_hz>=1000 || rtc_start>=0;
+    /* TSC guvenilir mi? get_uptime_ms() tsc_freq_hz<1000 ise 0 dondurur,
+       o zaman bekleme loop'u sonsuz doner. Onlemek icin timer_ok sadece
+       TSC frekansi onlemliyse veya RTC saat degisiyorsa true yapilir.
+       TSC yavarsa bile UTM'de get_uptime_ms() 0 doner — o zaman
+       RTC'den gunluk saniye farki alinir. */
+    int tsc_ok = g_sysinfo.tsc_freq_hz>=1000;
+    int rtc_ok = rtc_start>=0;
+    timer_ok = tsc_ok || rtc_ok;
+    /* TSC yavarsa RTC tabanli elapsed: rtc_start - simdi = gecmis */
+    if(!tsc_ok && rtc_ok) {
+        int now=rtc_seconds();
+        started=0; /* RTC modda TSC saat degil, saniye sayacindan */
+    }
     scene(); gpu_compose();
-    /* Quiet startup: show only the logo and a short progress animation. */
     while(timer_ok && !skip && elapsed_ms()<1200u) pump();
+    if(!timer_ok) {
+        int guard=0;
+        while(guard++<20000) pump();
+    }
     dbg_puts("[SPLASH] show loop ended\n");
     gpu_surface_destroy(screen); screen=NULL;
     dbg_puts("[SPLASH] screen destroyed\n");

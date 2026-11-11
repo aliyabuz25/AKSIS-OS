@@ -51,14 +51,17 @@ void wddm_init(void *fb_addr, uint32_t w, uint32_t h, uint32_t pitch, uint16_t b
         kstrcpy(g_wddm_adapter.name, "UEFI / VESA Standart Framebuffer");
     }
 
-    /* Desteklenen standart modlar */
+    /* Desteklenen standart modlar — 4K (UHD) öncelikli; VRAM'ı yetersiz
+       adaptor'lar 3840x2160 için BGA geçişini kendisi reddeder. */
     const wddm_mode_t standard_modes[] = {
-        { 0, 1920, 1080, 32, 60, "1920 x 1080 (Full HD 1080p - Onerilen)" },
-        { 1, 1600,  900, 32, 60, "1600 x 900 (HD+ 16:9)" },
-        { 2, 1440,  900, 32, 60, "1440 x 900 (WXGA+ 16:10)" },
-        { 3, 1280,  720, 32, 60, "1280 x 720 (HD 720p)" },
-        { 4, 1024,  768, 32, 60, "1024 x 768 (XGA 4:3)" },
-        { 5,  800,  600, 32, 60, "800 x 600 (SVGA)" }
+        { 0, 3840, 2160, 32, 60, "3840 x 2160 (UHD 4K - Onereilen)" },
+        { 1, 2560, 1440, 32, 60, "2560 x 1440 (QHD 1440p)" },
+        { 2, 1920, 1080, 32, 60, "1920 x 1080 (Full HD 1080p)" },
+        { 3, 1600,  900, 32, 60, "1600 x 900 (HD+ 16:9)" },
+        { 4, 1440,  900, 32, 60, "1440 x 900 (WXGA+ 16:10)" },
+        { 5, 1280,  720, 32, 60, "1280 x 720 (HD 720p)" },
+        { 6, 1024,  768, 32, 60, "1024 x 768 (XGA 4:3)" },
+        { 7,  800,  600, 32, 60, "800 x 600 (SVGA)" }
     };
 
     int count = (int)(sizeof(standard_modes) / sizeof(standard_modes[0]));
@@ -70,6 +73,13 @@ void wddm_init(void *fb_addr, uint32_t w, uint32_t h, uint32_t pitch, uint16_t b
     }
 
     g_wddm_adapter.current_mode_index = wddm_find_mode(w, h);
+}
+
+/* BGA'da hedef mod için yeterince VRAM var mı? 32 bpp için
+   width*height*4 bayt gerekli. */
+static int bga_vram_ok(uint32_t width, uint32_t height) {
+    uint64_t need = (uint64_t)width * height * 4;
+    return need <= (uint64_t)g_wddm_adapter.vram_bytes;
 }
 
 int wddm_is_hardware_switch_supported(void) {
@@ -104,7 +114,13 @@ int wddm_find_mode(uint32_t width, uint32_t height) {
 }
 
 int wddm_set_mode(uint32_t width, uint32_t height) {
-    if (width < 640 || height < 480 || width > 2560 || height > 1600) return 0;
+    if (width < 640 || height < 480 || width > 3840 || height > 2160) return 0;
+
+    /* BGA varsa VRAM sınırını kontrol et — 4K'ı desteklemeyen sanal
+       adaptor'de 32 bpp mod, framebuffer'ı bozar. */
+    if (g_wddm_adapter.bga_available && !bga_vram_ok(width, height))
+        return 0;
+
     if (g_wddm_adapter.current_width == width && g_wddm_adapter.current_height == height) {
         return 1; /* Zaten bu modda */
     }

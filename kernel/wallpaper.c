@@ -81,7 +81,7 @@ int wallpaper_init(void) {
         kmemcpy(&e->data_sector, entry_sec + 72,  4);
         kmemcpy(&e->data_size,   entry_sec + 76,  4);
 
-        if (e->w > 0 && e->h > 0 && e->w <= 2048 && e->h <= 2048)
+        if (e->w > 0 && e->h > 0 && e->w <= 3840 && e->h <= 2160)
             entry_count++;
     }
 
@@ -183,6 +183,22 @@ const wallpaper_entry_t *wallpaper_get_entry(int index) {
 /* ------------------------------------------------------------------ */
 /* wallpaper_load — entry'yi GPU surface'e yükle                     */
 /* ------------------------------------------------------------------ */
+static void wallpaper_load_crop(gpu_surface_t *dst, const uint8_t *raw_rgb,
+                                uint32_t src_w, uint32_t src_h) {
+    uint32_t dst_w = dst->w, dst_h = dst->h;
+    if (src_w < dst_w || src_h < dst_h) return; /* too small; caller handles */
+    /* 4K source on smaller screen: crop-center, no upscaling */
+    uint32_t cx = (src_w - dst_w) / 2, cy = (src_h - dst_h) / 2;
+    for (uint32_t y = 0; y < dst_h; y++) {
+        uint32_t *dst_row = dst->pixels + y * dst->stride;
+        const uint8_t *src_row = raw_rgb + ((cy + y) * src_w + cx) * 3;
+        for (uint32_t x = 0; x < dst_w; x++) {
+            const uint8_t *p = src_row + x * 3;
+            dst_row[x] = GPU_RGBA(p[0], p[1], p[2], 0xFF);
+        }
+    }
+}
+
 int wallpaper_load(int index, gpu_surface_t *dst) {
     if (!dst || index < 0 || index >= entry_count) return 0;
     wallpaper_entry_t *e = &entries[index];
@@ -195,13 +211,19 @@ int wallpaper_load(int index, gpu_surface_t *dst) {
     if (data_off >= wallpaper_img_size) return 0;
     const uint8_t *raw_rgb = wallpaper_img_data + data_off;
 
-    /* Fast path: 1:1 eslesme (or. 1920x1080) */
+    /* Fast path: 1:1 eslesme (or. 1920x1080 ekran + 1920x1080 kaynak) */
     if (src_w == dst_w && src_h == dst_h) {
         uint32_t npix = dst_w * dst_h;
         for (uint32_t i = 0; i < npix; i++) {
             uint32_t o = i * 3;
             dst->pixels[i] = GPU_RGBA(raw_rgb[o], raw_rgb[o + 1], raw_rgb[o + 2], 0xFF);
         }
+        return 1;
+    }
+
+    /* 4K duvar kagiği kucuk ekranda: ortadan crop, yukarida buyutme yok */
+    if (src_w >= dst_w && src_h >= dst_h) {
+        wallpaper_load_crop(dst, raw_rgb, src_w, src_h);
         return 1;
     }
 

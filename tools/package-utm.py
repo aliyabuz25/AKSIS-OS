@@ -13,7 +13,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('destination', type=Path)
     parser.add_argument('--name', default='SHENLONG OS v7.1')
-    parser.add_argument('--memory', type=int, default=6144)
+    parser.add_argument('--memory', type=int, default=8192)
     parser.add_argument('--screenshot', type=Path, default=None)
     parser.add_argument('-f', '--force', action='store_true', help='Overwrite destination if exists')
     args = parser.parse_args()

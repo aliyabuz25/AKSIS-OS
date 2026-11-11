@@ -34,7 +34,7 @@
 /* Surface — bağımsız piksel tamponu                                  */
 /* ------------------------------------------------------------------ */
 #define GPU_MAX_SURFACES 24
-#define GPU_SURFACE_BUF  (2560*1600*4)  /* max surface boyutu */
+#define GPU_SURFACE_BUF  (2560*1440*4)  /* max surface boyutu (QHD) */
 
 typedef struct {
     uint32_t *pixels;   /* RGBA piksel tamponu */

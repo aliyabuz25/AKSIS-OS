@@ -74,9 +74,25 @@ $(OUT)/test-axis-web: tools/test-axis-web.c kernel/axis_web/runtime.c kernel/axi
 test-axis-web: $(OUT)/test-axis-web
 	$(OUT)/test-axis-web
 
+RUN_QEMU    := $(shell command -v qemu-system-x86_64 2>/dev/null)
+RUN_VGA     := std
+
 run: iso
 	@if [ ! -f $(OUT)/shenlong-disk.img ]; then dd if=/dev/zero of=$(OUT)/shenlong-disk.img bs=1M count=64 status=none; fi
-	qemu-system-x86_64 -cdrom $(ISO) -drive file=$(OUT)/shenlong-disk.img,format=raw,if=ide -machine q35,i8042=on -cpu max -m 6144M -vga virtio -serial stdio -netdev user,id=hostnet,hostfwd=tcp:127.0.0.1:2222-:22 -device rtl8139,netdev=hostnet -audiodev coreaudio,id=audio -device AC97,audiodev=audio
+	qemu-system-x86_64 -cdrom $(ISO) -drive file=$(OUT)/shenlong-disk.img,format=raw,if=ide -machine q35,i8042=on -cpu max -m 6144M -vga $(RUN_VGA) -serial stdio -netdev user,id=hostnet,hostfwd=tcp:127.0.0.1:2222-:22 -device rtl8139,netdev=hostnet -audiodev coreaudio,id=audio -device AC97,audiodev=audio
+
+# UTM/VirtualBox icin 4K cizim testi: ramfb cizim motoru (4K gecerli mod).
+# UTM 4K destek icin host display ayarlarina bakin.
+run-4k: iso
+	@if [ ! -f $(OUT)/shenlong-disk.img ]; then dd if=/dev/zero of=$(OUT)/shenlong-disk.img bs=1M count=64 status=none; fi
+	qemu-system-x86_64 -cdrom $(ISO) -drive file=$(OUT)/shenlong-disk.img,format=raw,if=ide -machine q35,i8042=on -cpu max -m 12288M -device ramfb -serial stdio -netdev user,id=hostnet,hostfwd=tcp:127.0.0.1:2222-:22 -device rtl8139,netdev=hostnet -audiodev coreaudio,id=audio -device AC97,audiodev=audio
+
+# VirtIO-GPU 4K test (GPU passthrough taklidi; ramfb framebuffer 32bpp, 4K)
+run-virtio: iso
+	@if [ ! -f $(OUT)/shenlong-disk.img ]; then dd if=/dev/zero of=$(OUT)/shenlong-disk.img bs=1M count=64 status=none; fi
+	qemu-system-x86_64 -cdrom $(ISO) -drive file=$(OUT)/shenlong-disk.img,format=raw,if=ide -machine q35,i8042=on -cpu max -m 12288M -device ramfb -serial stdio -netdev user,id=hostnet,hostfwd=tcp:127.0.0.1:2222-:22 -device rtl8139,netdev=hostnet
+
+.PHONY: run run-4k run-virtio
 
 dirs:
 	@mkdir -p $(OUT)/kernel $(OUT)/shell \
@@ -129,8 +145,11 @@ $(PANIC_LOGO_OBJ): kernel/panic_logo.asm $(OUT)/panic-logo.rgb | dirs
 $(OUT)/panic-logo.rgb: /Users/ali_new/Desktop/panic.png tools/build-panic-logo.py | dirs
 	python3 tools/build-panic-logo.py $< $@
 
+# Vendored QuickJS 128-bit bolma islemleri icin libgcc (x86_64-elf) gerektirir.
+LIBGCC := $(wildcard /usr/local/lib/x86_64-elf-gcc-tmp/gcc/x86_64-elf/*/libgcc.a)
+
 $(KERNEL_ELF): $(ENTRY_OBJ) $(BOOT_LOGO_OBJ) $(MEDIA_OBJ) $(WALLPAPER_OBJ) $(PANIC_LOGO_OBJ) $(C_OBJS) $(BEAR_OBJS) $(AW_LIB) build/linker.ld
-	$(LD) $(LDFLAGS) --gc-sections $(ENTRY_OBJ) $(BOOT_LOGO_OBJ) $(MEDIA_OBJ) $(WALLPAPER_OBJ) $(PANIC_LOGO_OBJ) $(C_OBJS) $(BEAR_OBJS) $(AW_LIB) -o $@
+	$(LD) $(LDFLAGS) --gc-sections $(ENTRY_OBJ) $(BOOT_LOGO_OBJ) $(MEDIA_OBJ) $(WALLPAPER_OBJ) $(PANIC_LOGO_OBJ) $(C_OBJS) $(BEAR_OBJS) $(AW_LIB) $(LIBGCC) -o $@
 	@wc -c $@
 
 $(OUT)/limine-tool: $(LIMINE_DIR)/limine.c $(LIMINE_DIR)/limine-bios-hdd.h | dirs

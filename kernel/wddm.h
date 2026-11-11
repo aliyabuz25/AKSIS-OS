@@ -7,7 +7,7 @@
 
 #include "kernel.h"
 
-#define WDDM_MAX_MODES 8
+#define WDDM_MAX_MODES 10
 
 /* Bochs Graphics Adapter (BGA) VBE Dispi Register Tanımları */
 #define VBE_DISPI_IOPORT_INDEX           0x01CE

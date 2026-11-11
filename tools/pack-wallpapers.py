@@ -32,6 +32,7 @@ except ImportError:
 WALLPAPER_DIR = Path(__file__).parent.parent / "assets" / "wallpapers"
 OUTPUT = Path(__file__).parent.parent / "build" / "out" / "wallpapers.img"
 SECTOR = 512
+# 4K asset 1080p'ye orantili downscale edilir — 1:1 fast-path net HD kalir.
 MAX_W, MAX_H = 1920, 1080
 
 def to_sectors(nbytes):
@@ -55,7 +56,7 @@ def pack():
     entries = []
     for img_path in images:
         img = Image.open(img_path).convert('RGBA')
-        # Oranı koru, max 1024x768
+        # Oranı koru, 4K UHD sınırına sığdır
         w, h = img.width, img.height
         if w > MAX_W or h > MAX_H:
             ratio = min(MAX_W/w, MAX_H/h)

@@ -128,7 +128,7 @@ void dwm_draw_drop_shadow(gpu_surface_t *shadow, int w, int h) {
 }
 
 void dwm_resize_display(uint32_t new_w, uint32_t new_h) {
-    if (new_w < 640 || new_h < 480 || new_w > 2560 || new_h > 1600) return;
+    if (new_w < 640 || new_h < 480 || new_w > 3840 || new_h > 2160) return;
 
     /* Framebuffer global boyutlarını güncelle */
     gpu_fb_w     = new_w;

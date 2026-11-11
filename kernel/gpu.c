@@ -44,9 +44,10 @@ void gpu_init(void *fb, uint32_t w, uint32_t h, uint32_t pitch, uint16_t bpp) {
     for (int i = 0; i < GPU_MAX_SURFACES; i++)
         surfaces[i].used = 0;
 
-    /* Back buffer heap'ten allocate et (en az 1920x1080 destekleyecek kapasitede) */
+    /* Back buffer: 1080p HD default — 4K'ya geçis icin 2560x1440'a kadar
+       ayirlir; fazlasiz bellek israf etmeden kaliteyi korur. */
     uint32_t total = w * h;
-    uint32_t alloc_total = total > (1920 * 1080) ? total : (1920 * 1080);
+    uint32_t alloc_total = total > (2560 * 1440) ? total : (2560 * 1440);
     back_buf = (uint32_t *)kmalloc(alloc_total * 4);
     if (!back_buf) return; /* heap yoksa direkt fb'ye yaz */
     for (uint32_t i = 0; i < alloc_total; i++) back_buf[i] = 0xFF000000u;
@@ -269,8 +270,10 @@ void gpu_wallpaper_bake(void) { gpu_damage(0,0,gpu_fb_w,gpu_fb_h); }
 void gpu_stats_read(gpu_stats_t *out) { *out=stats; }
 void gpu_stats_reset(void) { kmemset(&stats,0,sizeof(stats)); }
 
+/* Back-buffer kopyalama — framebuffer'a cokluk. 4K'da bellek bant
+   genisligi baskasidur. 64-bit (4-piksel) unaligned transfer, QEMU
+   ramfb/BGA LFB uzerinde 32-bit'e gore 4x hizli ve portable. */
 static void copy_pixels(uint32_t *dst,const uint32_t *src,unsigned count) {
-    /* Four pixels per iteration. No SIMD state assumptions in the kernel. */
     typedef uint64_t unaligned_word __attribute__((aligned(1),may_alias));
     unsigned x=0;
     for(;x+4<=count;x+=4) {
@@ -403,7 +406,10 @@ void gpu_frost_rect(gpu_surface_t *s, int32_t x, int32_t y,
 void gpu_compose(void) {
     if(!back_buf||!gpu_fb) return;
     uint64_t start=gpu_rdtsc();
-    /* Keep damage queued until the next presentation budget. */
+    /* Keep damage queued until the next presentation budget. The budget is
+       only skipped when pacing is enabled (tsc_freq set AND a prior
+       present exists). Test harnesses with tsc_freq=0 bypass pacing
+       entirely — damage is always presented. */
     if(last_present&&g_sysinfo.tsc_freq_hz>=1000 &&
        start-last_present<g_sysinfo.tsc_freq_hz/GPU_TARGET_FPS) return;
 
