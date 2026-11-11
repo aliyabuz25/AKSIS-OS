@@ -1,0 +1,1 @@
+/* BearSSL is built with all intrinsic implementations disabled. */

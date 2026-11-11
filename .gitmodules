@@ -1,0 +1,12 @@
+[submodule "vendor/axis-web/lexbor"]
+	path = vendor/axis-web/lexbor
+	url = https://github.com/lexbor/lexbor.git
+[submodule "vendor/axis-web/musl"]
+	path = vendor/axis-web/musl
+	url = https://git.musl-libc.org/git/musl
+[submodule "vendor/axis-web/quickjs"]
+	path = vendor/axis-web/quickjs
+	url = https://github.com/bellard/quickjs.git
+[submodule "vendor/axis-web/stb"]
+	path = vendor/axis-web/stb
+	url = https://github.com/nothings/stb.git

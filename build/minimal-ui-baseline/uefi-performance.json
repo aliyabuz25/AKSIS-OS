@@ -1,0 +1,18 @@
+{
+  "frames": 128,
+  "pixels": 83104,
+  "avg pixels/frame": 649,
+  "avg compose us": 64,
+  "max compose us": 4692,
+  "width": 1920,
+  "height": 1080,
+  "input_events": 120,
+  "input_seconds": 1.403,
+  "drag": {
+    "frames": 152,
+    "pixels": 63220116,
+    "avg pixels/frame": 415921,
+    "avg compose us": 3448,
+    "max compose us": 7359
+  }
+}

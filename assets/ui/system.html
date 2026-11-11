@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head><meta charset="utf-8"><title>Sistem Ayarları · AXIS 10 Pro</title><link rel="stylesheet" href="ui.css"></head>
+<body>
+<div class="hero-card">
+  <h1>Sistem ve Donanım Ayarları</h1>
+  <p class="text-muted">Ayarlar &gt; Sistem &gt; Özellikler · Cihazınız güncel ve en yüksek performansta çalışıyor</p>
+</div>
+
+<div class="row">
+  <div class="col"><a class="btn btn-primary" href="file:///ui/system.html">Sistem Bilgisi</a></div>
+  <div class="col"><a class="btn" href="file:///ui/network.html">Ağ Durumu</a></div>
+  <div class="col"><a class="btn" href="file:///ui/files.html">Depolama</a></div>
+  <div class="col"><a class="btn" href="file:///ui/about.html">Windows Hakkında</a></div>
+</div>
+
+<div class="card">
+  <h2 class="card-title">Ekran Çözünürlüğü (WDDM 2.0 / DirectVideo)</h2>
+  <p class="text-muted">Aktif Çözünürlük: <span class="text-bold text-accent">{{RES}}</span> · 160Hz Donanım Kompozitörü</p>
+  <div class="row">
+    <div class="col"><a class="btn btn-primary" href="ipc:res:1920x1080">1920x1080 Full HD</a></div>
+    <div class="col"><a class="btn" href="ipc:res:1600x900">1600x900 HD+</a></div>
+    <div class="col"><a class="btn" href="ipc:res:1440x900">1440x900 Geniş</a></div>
+  </div>
+  <div class="row">
+    <div class="col"><a class="btn" href="ipc:res:1280x720">1280x720 720p</a></div>
+    <div class="col"><a class="btn" href="ipc:res:1024x768">1024x768 XGA</a></div>
+    <div class="col"><a class="btn" href="ipc:res:800x600">800x600 SVGA</a></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2 class="card-title">Cihaz Özellikleri</h2>
+  <table class="table">
+    <tr><th>Özellik</th><th>Değer</th></tr>
+    <tr><td>Cihaz Adı</td><td>AXIS-DESKTOP</td></tr>
+    <tr><td>İşlemci</td><td>{{CPU}}</td></tr>
+    <tr><td>Takılı RAM</td><td>{{RAM}}</td></tr>
+    <tr><td>Grafik Sürücüsü</td><td>{{GPU}}</td></tr>
+    <tr><td>Saat Dilimi</td><td>{{TIMEZONE}}</td></tr>
+    <tr><td>Sistem Mimarisi</td><td>64 bit x86_64 Long Mode Kernel</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2 class="card-title">Windows ve Çekirdek Belirtimleri</h2>
+  <table class="table">
+    <tr><th>Bileşen</th><th>Belirtim</th></tr>
+    <tr><td>Edisyon</td><td>{{OS_NAME}} {{OS_VERSION}}</td></tr>
+    <tr><td>Çekirdek</td><td>{{KERNEL}}</td></tr>
+    <tr><td>Arayüz Motoru</td><td>Jade 3.0 Ultra HTML5 &amp; CSS3 IPC Runtime</td></tr>
+    <tr><td>Kompozitör</td><td>DirectVideo 160 FPS DWM Retained Compositor</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2 class="card-title">Sistem Denetimleri (IPC Köprüsü)</h2>
+  <p class="text-muted">Aşağıdaki butonlarla işletim sistemi ayarlarını doğrudan yönetebilirsiniz:</p>
+  <div class="row">
+    <div class="col"><a class="btn" href="ipc:timezone:toggle">Saat Dilimi Değiştir (UTC / İstanbul)</a></div>
+    <div class="col"><a class="btn btn-primary" href="ipc:copilot:open">Axis AI Asistanını Aç</a></div>
+    <div class="col"><a class="btn btn-danger" href="ipc:reboot">Sistemi Yeniden Başlat</a></div>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,44 @@
+/* SHENLONG 7.1 — Fluent / WinUI-inspired system surface. */
+:root { --surface:#f7f7f7; --surface-alt:#fff; --text:#1a1a1a; --muted:#5d5d5d; --line:rgba(0,0,0,.10); --accent:#0067c0; --accent-hover:#005a9e; }
+* { box-sizing:border-box; }
+html,body { margin:0; background:var(--surface); color:var(--text); font-family:"Segoe UI",Arial,sans-serif; }
+body { max-width:1180px; margin:auto; padding:28px 32px 40px; }
+.settings-header { margin-bottom:24px; }
+.settings-header h1 { margin-bottom:4px; }
+.settings-layout { align-items:flex-start; gap:28px; }
+.settings-sidebar { flex:0 0 220px; min-width:180px; }
+.settings-sidebar nav { display:flex; flex-direction:column; gap:2px; }
+.settings-tab { display:block; padding:10px 12px; color:var(--text); border-left:3px solid transparent; border-radius:3px; font-size:14px; }
+.settings-tab:hover,.settings-tab:focus { background:#e9e9e9; text-decoration:none; }
+.settings-tab.active { background:#e5f1fb; color:var(--accent); border-left-color:var(--accent); font-weight:600; }
+.settings-content { flex:1 1 0; min-width:0; }
+.setting-row { display:flex; justify-content:space-between; align-items:center; gap:18px; min-height:70px; padding:12px 0; border-bottom:1px solid var(--line); }
+.setting-row p { margin:4px 0 0; }
+.quick-links { display:flex; flex-wrap:wrap; gap:10px; }
+h1 { margin:0 0 22px; font-size:32px; line-height:1.2; font-weight:600; letter-spacing:-.3px; }
+h2 { margin:28px 0 10px; font-size:20px; line-height:1.3; font-weight:600; }
+p { margin:8px 0; font-size:15px; line-height:1.45; color:var(--text); }
+.hero-card,.card,.stat-box,.metric-card { margin:0 0 24px; padding:0; background:transparent; border:0; border-radius:0; box-shadow:none; }
+.hero-card { border-left:0; }
+.card-title { margin-top:28px; }
+.text-muted,.card-text { color:var(--muted); }
+.text-accent { color:var(--accent); }
+.text-bold { font-weight:600; }
+.row { display:flex; flex-wrap:wrap; gap:24px; margin:0 0 24px; }
+.col { flex:1 1 180px; min-width:0; }
+a { color:var(--accent); text-decoration:none; }
+a:hover,a:focus { color:var(--accent-hover); text-decoration:underline; }
+.btn { display:inline-block; min-height:36px; padding:8px 16px; color:var(--text); background:var(--surface-alt); border:1px solid var(--line); border-radius:4px; text-decoration:none; font-size:14px; font-weight:600; text-align:center; }
+.btn:hover,.btn:focus { background:#f0f0f0; border-color:var(--accent); text-decoration:none; }
+.btn-primary { background:var(--accent); border-color:var(--accent); color:#fff !important; }
+.btn-primary:hover { background:var(--accent-hover); border-color:var(--accent-hover); }
+.btn-success { background:#107c10; border-color:#107c10; color:#fff !important; }
+.btn-danger { background:#c42b1c; border-color:#c42b1c; color:#fff !important; }
+table { width:100%; border-collapse:collapse; font-size:14px; margin:12px 0 28px; background:var(--surface-alt); }
+th,td { padding:12px 14px; text-align:left; border-bottom:1px solid var(--line); }
+th { color:var(--text); font-weight:600; background:#f1f1f1; border-bottom:2px solid var(--accent); }
+td { color:var(--text); }
+.badge { display:inline; padding:0; font-size:inherit; font-weight:600; border:0; border-radius:0; background:transparent; color:var(--text); }
+.bg-success { color:#107c10; }
+.bg-danger { color:#c42b1c; }
+.bg-primary { color:var(--accent); }

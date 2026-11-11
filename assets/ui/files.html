@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head><meta charset="utf-8"><title>Dosyalar ve Depolama · AXIS 10 Pro</title><link rel="stylesheet" href="ui.css"></head>
+<body>
+<div class="hero-card">
+  <h1>Dosyalar ve Kalıcı Depolama</h1>
+  <p class="text-muted">AXIS OS 10 Pro · Kalıcı Disk ve Dosya Yönetim Sistemi</p>
+</div>
+
+<div class="row">
+  <div class="col"><a class="btn" href="file:///ui/system.html">Sistem Ayarları</a></div>
+  <div class="col"><a class="btn" href="file:///ui/network.html">Ağ Durumu</a></div>
+  <div class="col"><a class="btn btn-primary" href="file:///ui/files.html">Depolama</a></div>
+  <div class="col"><a class="btn" href="file:///ui/about.html">Hakkında</a></div>
+</div>
+
+<div class="card">
+  <h2 class="card-title">Kalıcı Depolama Sürücüleri</h2>
+  <table class="table">
+    <tr><th>Sürücü</th><th>Bağlantı Noktası</th><th>Dosya Sistemi</th><th>Durum</th></tr>
+    <tr><td>Birincil Sabit Disk</td><td>/dev/ide0</td><td>SHENFS02 Kalıcı VFS</td><td><span class="badge bg-success">Bağlı &amp; Etkin</span></td></tr>
+    <tr><td>Sistem Bellek Diski</td><td>RAM Virtual VFS</td><td>Direct Heap Paging</td><td><span class="badge bg-primary">4.00 GB Aktif</span></td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2 class="card-title">Hızlı Dizin Gezintisi (IPC)</h2>
+  <p class="text-muted">Aşağıdaki klasörlere tek tıkla erişebilir veya terminalden yönetebilirsiniz:</p>
+  <div class="row">
+    <div class="col"><a class="btn btn-primary" href="ipc:file:nav:/home">📁 /home (Kullanıcı)</a></div>
+    <div class="col"><a class="btn" href="ipc:file:nav:/ui">🎨 /ui (HTML &amp; CSS)</a></div>
+    <div class="col"><a class="btn" href="ipc:file:nav:/etc">⚙️ /etc (Yapılandırma)</a></div>
+    <div class="col"><a class="btn" href="ipc:file:nav:/movies">🎬 /movies (Medya)</a></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2 class="card-title">Geliştirici &amp; Sistem Araçları</h2>
+  <p class="text-muted">Tüm sistem arayüzü HTML/CSS ile yazılmıştır ve doğrudan düzenlenebilir:</p>
+  <div class="row">
+    <div class="col"><a class="btn btn-success" href="ipc:app:terminal">Terminal Kabuğu Başlat</a></div>
+    <div class="col"><a class="btn" href="ipc:app:browser">Jade Tarayıcıda Aç</a></div>
+    <div class="col"><a class="btn btn-primary" href="ipc:copilot:open">Axis AI Asistanı</a></div>
+  </div>
+</div>
+</body></html>

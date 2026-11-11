@@ -1,0 +1,23 @@
+# Build outputs & temporary objects
+build/out/
+*.o
+*.iso
+*.bin
+*.elf
+*.img
+*.log
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# UTM & VM bundle images / snapshots
+build/*.utm
+*.utm
+
+# Editor / IDE
+.vscode/
+.idea/
