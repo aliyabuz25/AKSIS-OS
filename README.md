@@ -2,210 +2,230 @@
 
 # AKSIS OS
 
-### Modern x86_64 Mikro Çekirdek ve Grafik Masaüstü İşletim Sistemi
+### A 64-bit x86 Operating System and Desktop Environment
 
-[![Mimari: x86_64](https://img.shields.io/badge/Mimari-x86__64-blue.svg)](#sistem-mimarisi)
-[![Önyükleyici: Limine UEFI / BIOS](https://img.shields.io/badge/%C3%96ny%C3%BCkleyici-Limine%20UEFI%20%2F%20BIOS-orange.svg)](#sistem-mimarisi)
-[![Arayüz: 1080p DWM Kompozitör](https://img.shields.io/badge/Aray%C3%BCz-1080p%20FHD%20%7C%20DWM%20UI-success.svg)](#grafik-arayüz-ve-pencere-yöneticisi)
-[![Ağ: RTL8139 / TCP / TLS](https://img.shields.io/badge/A%C4%9F-RTL8139%20%7C%20TCP%20%7C%20BearSSL-purple.svg)](#ağ-yığını-ve-web-motoru)
-[![Lisans: GPL-3.0](https://img.shields.io/badge/Lisans-GPL--3.0-green.svg)](LICENSE)
+[![Architecture: x86_64](https://img.shields.io/badge/Architecture-x86__64-blue.svg)](#system-architecture)
+[![Bootloader: Limine UEFI / BIOS](https://img.shields.io/badge/Bootloader-Limine%20UEFI%20%2F%20BIOS-orange.svg)](#boot-and-firmware-interface)
+[![Compositor: 1080p DWM](https://img.shields.io/badge/Compositor-1080p%20FHD%20%7C%20DWM-success.svg)](#graphics-and-window-composition)
+[![Networking: RTL8139 / TCP / TLS](https://img.shields.io/badge/Networking-RTL8139%20%7C%20TCP%20%7C%20BearSSL-purple.svg)](#network-stack-and-web-runtime)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-green.svg)](LICENSE)
 
 <br/>
 
-AKSIS OS, 64-bit x86 donanım mimarisi üzerinde bağımsız çalışabilen; çekirdek düzeyinden masaüstü ortamına kadar saf C ve Assembly dilleriyle geliştirilmiş bir işletim sistemidir. UEFI ve Legacy BIOS ortamlarını destekleyen Limine önyükleyicisi üzerinde çalışır; kendi çift tamponlu pencere kompozitörüne, kalıcı dosya sistemine ve donanım düzeyinde ağ yığınına sahiptir.
+AKSIS OS is an independent operating system and desktop environment developed from scratch in C and x86_64 assembly. Designed for the 64-bit x86 architecture, it boots across UEFI and legacy BIOS systems via the Limine protocol, featuring an integrated retained-mode window compositor, virtual filesystem with ATA persistence, hardware-driven TCP/IP networking, and an in-kernel web runtime.
 
-[Genel Bakış](#genel-bakış) • [Sistem Mimarisi](#sistem-mimarisi) • [Grafik Arayüz](#grafik-arayüz-ve-pencere-yöneticisi) • [Ağ ve Web](#ağ-yığını-ve-web-motoru) • [Derleme ve Çalıştırma](#derleme-ve-çalıştırma) • [Dizin Yapısı](#dizin-yapısı) • [Lisans](#lisans)
+[Overview](#overview) • [System Architecture](#system-architecture) • [Kernel Subsystems](#kernel-subsystems) • [Graphics and Composition](#graphics-and-window-composition) • [Network Stack and Web Runtime](#network-stack-and-web-runtime) • [Building and Running](#building-and-running) • [Directory Layout](#directory-layout) • [License](#license)
 
 </div>
 
 ---
 
-## Genel Bakış
+## Overview
 
-AKSIS OS, modern donanım olanaklarını sade ve modüler bir mimariyle buluşturmayı hedefler. Geleneksel monolitik Unix benzeri yapıların temel kabiliyetlerini korurken; kullanıcı deneyimini doğrudan çekirdeğe entegre edilmiş bir pencere yöneticisi ve hafif bir yerel web çalışma zamanı ile zenginleştirir.
+AKSIS OS is designed around clean hardware abstraction, low-latency display composition, and modular kernel service separation without reliance on external monolithic POSIX runtimes. It provides a complete freestanding operating environment: booting directly into a 1080p double-buffered graphical desktop, managing isolated window surfaces, routing network packets through a native TCP/IP stack, and evaluating client-side DOM and JavaScript workloads natively.
 
-Sistemin temel tasarım hedefleri:
-- Dış bağımlılıklardan arındırılmış, doğrudan donanım seviyesinde çalışan kararlı bir çekirdek altyapısı kurmak.
-- Yüksek çözünürlüklü (1080p) grafik modlarında bile düşük gecikmeli, akıcı bir masaüstü etkileşimi sunmak.
-- Standartlara uyumlu ağ protokolleri ve HTML/JavaScript ayrıştırıcıları ile konuk sistem içerisinde hafif web tabanlı araçların çalıştırılmasını sağlamak.
+Primary design goals include:
+- A freestanding 64-bit Long Mode kernel with strict separation between physical memory management and paging layers.
+- High-throughput graphics pipelines leveraging Page Attribute Table (PAT) write-combining and dirty-region pacing.
+- Self-contained networking and cryptographic primitives capable of establishing secure TLS connections directly from kernel space.
+- A standards-compliant DOM parser and JavaScript execution engine embedded directly into userland services.
 
 ---
 
-## Sistem Mimarisi
+## System Architecture
 
-Çekirdek mimarisi, donanım kaynaklarının doğrudan soyutlanması ve katmanlar arası veri iletiminin en az ek yükle sağlanması prensibine dayanır.
+The operating system follows a layered architecture where user-facing applications interface with hardware through structured driver abstractions and an asynchronous display composition subsystem.
 
 ```mermaid
 graph TD
-    subgraph Kullanici_Alani ["Kullanıcı Alanı"]
-        term["Terminal Kabuk"]
-        axis_web["AXIS Web & JS"]
-        file_mgr["Dosya Yöneticisi"]
-        sys_panel["Sistem Paneli"]
-        media_app["Medya Oynatıcı"]
+    subgraph Userland ["Userland Applications & Shell"]
+        terminal["Terminal Shell"]
+        web_app["AXIS Web & JS"]
+        file_manager["File Manager"]
+        system_mgr["System Panel"]
+        media_player["Media Player"]
     end
 
-    subgraph Grafik_Katmani ["Grafik ve Pencere Yönetimi"]
-        dwm["DWM Kompozitör (100 Hz Pacing)"]
-        surfaces["Pencere Yüzeyleri & Çift Tamponlama"]
-        gdi["2D GDI & Vektörel Çizim Motoru"]
+    subgraph Composition ["Window Management & Graphics"]
+        dwm["DWM Window Compositor (100 Hz Paced)"]
+        surfaces["Surface Manager & Double Buffering"]
+        gdi["2D Vector & Font Rasterizer"]
     end
 
-    subgraph Hizmet_Katmani ["Sistem Hizmetleri"]
-        vfs["Sanal Dosya Sistemi (VFS)"]
-        ata["ATA/IDE Sürücüsü (Kalıcı Disk /dev/ide0)"]
-        net["Ağ Yığını (TCP/IP & TLS)"]
-        input["PS/2 Klavye ve Fare Sürücüleri"]
+    subgraph Subsystems ["Core Services & Driver Model"]
+        vfs["Virtual File System (VFS)"]
+        ata_driver["ATA / IDE Driver (Block Storage /dev/ide0)"]
+        net_stack["Network Stack (IPv4 / TCP / UDP / TLS)"]
+        ps2_driver["PS/2 Keyboard & Mouse Controller"]
     end
 
-    subgraph Cekirdek ["AKSIS Çekirdek (x86_64 Long Mode)"]
-        idt["Kesme Yönetimi (IDT / PIC)"]
-        paging["Bellek Yönetimi (4-Level Paging & PAT)"]
-        sched["Süreç ve Görev Yöneticisi"]
-        tsc["Zamanlayıcı (TSC / RTC)"]
+    subgraph Kernel ["AKSIS Kernel (x86_64 Long Mode)"]
+        idt["Interrupt Handling (IDT / PIC)"]
+        mmu["Memory Management (4-Level Paging & PAT)"]
+        scheduler["Process & Task Scheduler"]
+        timers["High-Precision Timing (TSC / RTC)"]
     end
 
-    subgraph Onyukleme ["Önyükleme Katmanı"]
-        limine["Limine Önyükleyici (UEFI / BIOS)"]
+    subgraph Boot ["Firmware & Bootloader"]
+        limine["Limine Boot Protocol (UEFI / BIOS)"]
     end
 
-    subgraph Donanim ["Fiziksel Donanım"]
-        hw["CPU, RAM, GPU VRAM, NIC, Disk"]
+    subgraph Hardware ["Physical Hardware"]
+        cpu["x86_64 CPU"]
+        ram["Physical Memory (RAM)"]
+        gpu["Framebuffer & Video RAM"]
+        nic["RTL8139 PCI NIC"]
+        disk["ATA Drive"]
     end
 
-    Kullanici_Alani --> Grafik_Katmani
-    Kullanici_Alani --> Hizmet_Katmani
-    Grafik_Katmani --> Cekirdek
-    Hizmet_Katmani --> Cekirdek
-    Cekirdek --> Onyukleme
-    Onyukleme --> Donanim
+    Userland --> Composition
+    Userland --> Subsystems
+    Composition --> Kernel
+    Subsystems --> Kernel
+    Kernel --> Boot
+    Boot --> Hardware
 ```
 
-### Çekirdek ve Bellek Yönetimi
-- **x86_64 Long Mode:** 64-bit korumalı kip, 4 düzeyli sayfalama (4-level paging) ve IDT tabanlı kesme dağıtımı.
-- **PAT (Page Attribute Table):** Grafik işlem biriminin video çerçeve belleği için Write-Combining yapılandırması etkinleştirilmiştir; bu sayede 1080p çözünürlükte ekran tazeleme gecikmesi en aza indirilir.
-- **Zamanlama Mekanizması:** TSC (Time Stamp Counter) tabanlı yüksek hassasiyetli saat takibi ve donanımsal RTC senkronizasyonu.
+---
 
-### Dosya Sistemi ve Kalıcılık
-- **VFS (Sanal Dosya Sistemi):** Unix tarzı dosya izin modelini (okuma, yazma, çalıştırma izinleri) destekleyen dizin ağacı yapısı.
-- **Kalıcı Depolama:** ATA/IDE kontrolcüsü üzerinden PIO modunda doğrudan disk erişimi sağlanır. `/dev/ide0` aygıtı üzerindeki değişiklikler kalıcı olarak disk bloklarına kaydedilir.
+## Kernel Subsystems
+
+### Memory Management and Paging
+- **64-bit Long Mode Initialization:** Boots with flat physical addressing, sets up an isolated 4-level paging structure, and handles interrupt dispatching through a dedicated Interrupt Descriptor Table (IDT).
+- **Page Attribute Table (PAT):** Configures Write-Combining caching policies over physical video memory mappings. This reduces memory bus contention and eliminates tearing during 1080p framebuffer blits.
+- **Dynamic Allocation:** Features an early bump allocator for stage-one initialization, transitioning into a tracked heap allocator with memory validation.
+
+### Virtual File System and Storage
+- **VFS Architecture:** Implements a Unix-style node and directory hierarchy supporting standard file permission octets (owner, group, other flags).
+- **Block Driver and Persistence:** An integrated ATA/IDE driver operating in PIO mode mounts `/dev/ide0`. Filesystem mutations persist directly to physical block storage.
+- **Pseudo Filesystems:** Exposes runtime status nodes including `/sys/uptime`, `/sys/meminfo`, and transient memory storage under `/tmp`.
+
+### Timing and Execution
+- **TSC Calibration:** Hardware TSC (Time Stamp Counter) measures operational frequency at boot.
+- **Real-Time Clock:** Real-time fallback synchronized against the motherboard RTC provides UTC date and wall-clock time preservation.
 
 ---
 
-## Grafik Arayüz ve Pencere Yöneticisi
+## Graphics and Window Composition
 
-AKSIS OS, basit metin kabuklarının ötesinde kullanıcı dostu ve akıcı bir masaüstü arabirimi sunar.
+The desktop interface operates as a native composited environment built upon a Desktop Window Manager (DWM) architecture.
 
-- **DWM Tabanlı Kompozitör:** Pencereler birbirinden bağımsız yüzeyler (surface) olarak ayrılır ve 100 Hz pacing sınırı ile tam ekran kompozisyonunda birleştirilir.
-- **Pencere Kontrolleri:** Pencereler taşınabilir, boyutlandırılabilir, simge durumuna küçültülebilir ve kapatılabilir. İçerik tamponları boyut değişimlerinde korunur.
-- **Görsel Tasarım:**
-  - Saydam pencere başlıkları ve menü katmanları.
-  - 4x4 alt piksel örneklemeli yumuşatılmış fare imleci ve kontrol kenarlıkları.
-  - Prosedürel vektörel simge çizimi ve Selawik tabanlı Türkçe anti-aliased bitmap font desteği.
-  - Noto Sans Mono tabanlı UTF-8 uyumlu terminal görünümü.
-- **Giriş Desteği:** Türkçe Q klavye dizilimi, karakter kodlama dönüşümleri ve fare sürücüsü sistem düzeyinde entegre edilmiştir.
+- **Retained Surface Model:** Applications render into dedicated double-buffered off-screen memory surfaces. The compositor performs dirty-region calculation, alpha blending, and clipped updates.
+- **Frame Pacing:** Render passes are capped at 100 Hz to prevent CPU starvation while maintaining sub-frame interactive latency.
+- **Typography and Rasterization:**
+  - High-legibility anti-aliased bitmap fonts derived from Selawik and Noto Sans Mono.
+  - Subpixel anti-aliased 4x4 coverage sampling for cursors and window frames.
+  - Procedural vector rendering for icons and interface controls.
+- **Input Handling:** Complete PS/2 keyboard processing with full UTF-8 character encoding and mouse packet normalization.
 
 ---
 
-## Ağ Yığını ve Web Motoru
+## Network Stack and Web Runtime
 
-İşletim sistemi, modern web teknolojilerini doğrudan kendi alt katmanlarında çalıştırabilecek donanım sürücülerine ve kütüphane entegrasyonlarına sahiptir:
+AKSIS OS includes an in-tree network stack and an embedded HTML/JS execution environment designed to operate without host dependencies.
 
 ```mermaid
 graph LR
-    nic["Ethernet Paketi"] --> driver["RTL8139 Sürücüsü"]
-    driver --> arp_ip["ARP / IPv4 Katmanı"]
+    nic["Ethernet Frame"] --> driver["RTL8139 Driver"]
+    driver --> arp_ip["ARP / IPv4 Engine"]
     
-    arp_ip --> icmp["ICMP / DHCP"]
-    arp_ip --> tcp["TCP Soket API"]
+    arp_ip --> icmp_dhcp["ICMP & DHCP Client"]
+    arp_ip --> tcp_stream["TCP / Socket Engine"]
     
-    tcp --> tls["BearSSL (TLS 1.2 / 1.3)"]
-    tls --> http["HTTP / HTTPS İstemcisi"]
+    tcp_stream --> tls_layer["BearSSL (TLS 1.2 / 1.3)"]
+    tls_layer --> http_client["HTTP / HTTPS Client"]
     
-    http --> lexbor["Lexbor HTML5 / CSS DOM"]
-    http --> qjs["QuickJS ES2020 Çalışma Zamanı"]
+    http_client --> lexbor["Lexbor C99 (HTML5 / DOM)"]
+    http_client --> qjs["QuickJS Engine (ES2020)"]
     
-    lexbor --> runtime["AXIS Web Uygulama Katmanı"]
-    qjs --> runtime
+    lexbor --> web_runtime["AXIS Web Platform"]
+    qjs --> web_runtime
 ```
 
-- **Ağ Arayüzü:** Realtek RTL8139 PCI denetleyicisi ile yerel Ethernet paket iletimi.
-- **Protokol Yığını:** ARP adresi çözümleme, IPv4 paketleme, ICMP ping yanıtları, DHCP ile dinamik IP yapılandırması ve tam çift yönlü TCP bağlantıları.
-- **Şifreli İletişim (TLS):** BearSSL kütüphanesi ile TLS 1.2/1.3 el sıkışması ve HTTPS bağlantı güvenliği.
-- **Yerel Web Çalışma Zamanı:**
-  - **Lexbor:** C99 standardında yazılmış, harici bağımlılığı olmayan tam HTML5, DOM ve CSS ayrıştırma motoru.
-  - **QuickJS:** ES2020 standardını destekleyen hafif JavaScript motoru; çekirdek içi DOM olaylarıyla çift yönlü köprü oluşturur.
-- **Güvenli Kabuk (SSH):** Sistem, uzaktan yönetim için yerleşik bir SSH-2.0 sunucu oturum yöneticisi barındırır.
+| Component | Implementation | Responsibility |
+|---|---|---|
+| **NIC Driver** | Realtek RTL8139 (PCI) | Hardware packet TX/RX and ring buffer management |
+| **Network Protocols** | ARP, IPv4, ICMP, DHCP | Packet routing, address resolution, dynamic lease acquisition |
+| **Transport Layer** | TCP, UDP | Connection state machines, window scaling, reliable transport |
+| **Cryptography** | BearSSL 0.6 | TLS 1.2/1.3 handshakes, cipher suites, X.509 certificate validation |
+| **HTML Parser** | Lexbor (Pure C99) | Standards-compliant HTML5 parsing, CSS cascade, DOM tree construction |
+| **JavaScript Engine** | QuickJS | Full ES2020 specification support, DOM event bindings, microtask queue |
+| **Secure Shell** | Embedded SSH-2.0 | Remote administrative shell and authentication subsystem |
 
 ---
 
-## Derleme ve Çalıştırma
+## Building and Running
 
-### Gereksinimler
+### Prerequisites
 
-Sistemi kaynak koddan derlemek ve test etmek için aşağıdaki araçlar gereklidir:
+Compilation requires standard cross-development tools targeting freestanding x86_64 ELF:
 
-- `gcc` veya `clang` (x86_64 hedefli çapraz derleme desteği)
-- `nasm` (Assembly derleyicisi)
+- `gcc` or `clang`
+- `nasm` (Assembler)
 - `make`
-- `xorriso` ve `mtools` (Önyüklenebilir ISO ve FAT imajı üretimi için)
-- `qemu-system-x86_64` (Sanal makine ortamında çalıştırma için)
+- `xorriso` and `mtools` (ISO9660 and FAT image manipulation)
+- `qemu-system-x86_64` (Hardware emulation)
 
-macOS üzerinde gerekli araçları yüklemek için:
+#### macOS (Homebrew)
 ```bash
 brew install nasm qemu xorriso mtools
 ```
 
-### Adım Adım Derleme
+#### Debian / Ubuntu
+```bash
+sudo apt-get install build-essential nasm qemu-system-x86 xorriso mtools
+```
 
-1. Depoyu yerel ortama kopyalayın:
+### Build Instructions
+
+1. Clone the repository and initialize submodules:
    ```bash
    git clone --recurse-submodules https://github.com/aliyabuz25/AKSIS-OS.git
    cd AKSIS-OS
    ```
 
-2. Çekirdek ve önyüklenebilir hibrit ISO dosyasını derleyin:
+2. Compile the kernel and generate the hybrid bootable ISO image:
    ```bash
    make iso
    ```
-   *Bu işlem sonucunda `build/out/shenlong.iso` dosyası üretilir.*
+   *The target image will be generated at `build/out/shenlong.iso`.*
 
-3. Sanal makine üzerinde çalıştırın:
+3. Launch within QEMU:
    ```bash
-   # BIOS kipi ile çalıştırma
+   # BIOS boot
    make run
 
-   # UEFI kipi ile çalıştırma
+   # UEFI boot
    make run-uefi
    ```
 
-4. Doğrulama ve arayüz testlerini yürütün:
+4. Execute validation test suites:
    ```bash
    make test
    ```
 
 ---
 
-## Dizin Yapısı
+## Directory Layout
 
 ```
 AKSIS-OS/
-├── assets/          # Duvar kağıtları, TrueType yazı tipleri, boot logoları ve HTML arayüz şablonları
-├── bootloader/      # MBR, Stage2 ve CD açılış montaj kodları
-├── build/           # Limine konfigürasyonları, linker betikleri ve ortam kurulum dosyaları
-├── docs/            # Mimari detaylar, web motoru belgeleri ve geliştirici notları
-├── kernel/          # Çekirdek kaynak kodları (Bellek, IDT, VFS, GPU, DWM, TCP/IP, UI, Sürücüler)
-│   ├── axis_web/    # Lexbor ve QuickJS çalışma zamanı bağlayıcıları
-│   └── libc/        # Çekirdek içi bağımsız standart C başlık dosyaları
-├── limine/          # Limine UEFI ve BIOS önyükleme ikilileri
-├── shell/           # Kullanıcı kabuğu kaynakları
-├── tools/           # Yazı tipi oluşturucular, test araçları ve paketleme betikleri
-└── vendor/          # Bağımsız harici kütüphaneler (BearSSL, QuickJS, Lexbor, stb, pl_mpeg)
+├── assets/          # Interface templates, fonts, boot logos, and media assets
+├── bootloader/      # MBR stage1, stage2, and CD-ROM boot assembly routines
+├── build/           # Limine configuration, linker scripts, and build harness
+├── docs/            # Architecture specifications and technical references
+├── kernel/          # Core operating system source code
+│   ├── axis_web/    # Lexbor and QuickJS runtime integration bindings
+│   └── libc/        # Freestanding C runtime header stubs
+├── limine/          # Limine bootloader UEFI and BIOS binaries
+├── shell/           # Userland command-line interface implementation
+├── tools/           # Asset compressors, font builders, and VM packaging scripts
+└── vendor/          # In-tree vendor libraries (BearSSL, Lexbor, QuickJS, stb)
 ```
 
 ---
 
-## Lisans
+## License
 
-Bu proje [GNU General Public License v3.0](LICENSE) şartları altında sunulmaktadır. Ayrıştırma ve kullanım hakları için lisans metnini inceleyebilirsiniz.
+This project is licensed under the [GNU General Public License v3.0](LICENSE). Refer to the `LICENSE` file for the full terms and conditions.
 EOF
